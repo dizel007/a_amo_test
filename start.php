@@ -10,7 +10,10 @@ require_once 'parts/parce_excel_file.php'; // парсер ексель КП
 require_once 'libs/PHPExcel-1.8/Classes/PHPExcel.php';
 require_once 'libs/PHPExcel-1.8/Classes/PHPExcel/Writer/Excel2007.php';
 require_once 'libs/PHPExcel-1.8/Classes/PHPExcel/IOFactory.php';
-
+$count = 0;
+echo "<br>";
+echo date('Y-m-d H:i:s');
+echo "<br>";
 $connect_data['access_token'] = $access_token ;
 // echo "<br>";
 $connect_data['subdomain'] = $subdomain;
@@ -18,7 +21,7 @@ $connect_data['subdomain'] = $subdomain;
 
 echo "<pre>";
   // Вычитываем все телефоны с таким ИНН
-  $stmt = $pdo->prepare("SELECT id,InnCustomer, NameCustomer FROM reestrkp ORDER BY id DESC LIMIT 5");
+  $stmt = $pdo->prepare("SELECT id,InnCustomer, NameCustomer FROM reestrkp ORDER BY id DESC LIMIT 100");
   // $stmt = $pdo->prepare("SELECT * FROM reestrkp ORDER BY id DESC LIMIT 100");
 
   $stmt->execute([]);
@@ -73,5 +76,12 @@ foreach ($arr_inn_name as $j_inn) {
     }
 
     sleep(1);
+    $count++;
+    echo date('Y-m-d H:i:s');
+    echo "<br>";
+    echo "<br> CONUT =$count<br>";
+
     echo "<br><b>*************************************************************************************************</b><br>";
 }
+
+echo "<br> OYOGO=$count";

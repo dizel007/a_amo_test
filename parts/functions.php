@@ -649,7 +649,7 @@ function add_note_to_sdelka ($connect_data, $sdelki, $id_sdelka) {
     $comment = $sdelki['Comment'];
     $arr_comment = explode('||+', $comment); // массив с комментариями
     print_r($arr_comment);
-    
+    $arr_comment = array_reverse($arr_comment); // разворачиваем массив
      foreach ($arr_comment as $item_comment) {
       
           if ((strlen($item_comment) > 6)) {
