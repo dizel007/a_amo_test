@@ -81,16 +81,34 @@ echo "<br>company_id = $company_id<br>";
 
 // ************** цепляем ЗАДАЧА к сделке  (если она есть)
 // echo "<br> цепляем задачу к сделке  (если она есть)  ********************************************<br>";
+if ($sdelki['FinishContract'] == 0)  {
+    // make_new_task($connect_data, $sdelki, $id_sdelka);
+} 
+// ********************  Добавляем товары только в открытую сделку  ***********************************************
 
-    make_new_task($connect_data, $sdelki, $id_sdelka);
-    
-// ********************  Редактируем статус сделки  ***********************************************
+if ($sdelki['FinishContract'] == 0)  {
 
-echo "<br>  Редактируем статус сделки  ВОРОНКА: ($pipeline_id) *******<br>";
+// Получаем список товаров из КП
 
 
-//   $result = change_status_sdelka_in_amo($connect_data, $sdelki, $id_sdelka, $pipeline_id) ;
+$link_excel_kp_tovar = ''. $sdelki['LinkKp']; // ссылка на EXCEL файл с номенклатурой
 
-//   echo "<pre>";
-//   print_r($result);
+echo $link_excel_kp_tovar."<br>";
+
+if (file_exists($link_excel_kp_tovar)) {
+    echo "<br>*********** НАШЛИ ФАЙЛ *****************<br>";
+    $arr_tovari = parce_excel_kp($link_excel_kp_tovar);
+    print_r($arr_tovari);
+    add_tovar_to_sdelka ($connect_data, $arr_tovari, $id_sdelka) ;
+} else {
+    echo "<br>*********** ОТСУТСТВУЕТ ФАЙЛ *****************<br>";
 }
+ 
+}
+/// Добавляем примечание к сделке
+add_note_to_sdelka ($connect_data, $sdelki, $id_sdelka);
+
+// обновляем id амо сделки в реестре
+update_amo_id_in_my_reesrt ($pdo, $id_sdelka, $sdelki);
+
+} // конец цикла по перебору КП

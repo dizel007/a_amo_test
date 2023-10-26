@@ -6,79 +6,56 @@
   echo  $name_company = $j_inn['NameCustomer']; // Наименование компании
 
 
-// ************************* Добавляем сделки к компаниям *******************************************
+// ************************* Достаем нашу сделку по ID *******************************************
 $stmt = $pdo->prepare("SELECT * FROM reestrkp WHERE id = $id");
 $stmt->execute([]);
 $arr_sdelki = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+
+
 /*******************************************************************
 *  ***** Если у сделки нет ИНН то создае только сделку
 **************************************************************** */
-unset($res);
-foreach ($arr_sdelki as $sdelki) {
+$sdelki  = $arr_sdelki[0];
+
 $name_sdelka = "№".$sdelki['KpNumber']." от " .$sdelki['KpData'] ." ($name_company)";
-echo "$name_sdelka ********************************************************************** СДЕЛКУ<br>";
+echo "<br>$name_sdelka Название сделки СДЕЛКУ<br>";
 $link_to_change_kp = 'https://brazel.ru/?transition=30&id='.$sdelki['id'];
-$link_to_see_pdf = 'https://brazel.ru/'.$sdelki['LinkKp'];
+$link_to_see_excel = 'https://brazel.ru/'.$sdelki['LinkKp'];
 $price_sdelka = (int)($sdelki['KpSum']);
-$pipeline_id_2 = 7242730;
-// формируем массив для созждания сделки
-$data_sdelka2 = Make_simple_sdelka ($name_sdelka, $link_to_change_kp, $link_to_see_pdf, $price_sdelka, $pipeline_id_2); 
-post_query_in_amo($access_token, $subdomain , '/api/v4/leads' , $data_sdelka2);
-$id_sdelka = $res["_embedded"]["leads"][0]["id"]; // ID созданной сделки
 
+$pipeline_id_2 = MAIN_PIPELINE_ID; // БЕЗ ИНН ТОЛЬКО В ОБЩУЮ ПАПКУ 
 
+$id_sdelka = make_new_sdelka_SIMPLE($connect_data, $sdelki, $pipeline_id_2);
 
+echo "<br> ******* СОЗДАЛИ СДЕЛКУ ID = $id_sdelka **********************<br>";
 
+// ************** цепляем ЗАДАЧА к сделке  (если она есть)
+// make_new_task($connect_data, $sdelki, $id_sdelka);
+// ********************  Добавляем товары только в открытую сделку  ***********************************************
 
+if ($sdelki['FinishContract'] == 0)  {
 
+  // Получаем список товаров из КП
+  
+  
+  $link_excel_kp_tovar = ''. $sdelki['LinkKp']; // ссылка на EXCEL файл с номенклатурой
+  
+  echo $link_excel_kp_tovar."<br>";
+  
+  if (file_exists($link_excel_kp_tovar)) {
+      echo "<br>*********** НАШЛИ ФАЙЛ *****************<br>";
+      $arr_tovari = parce_excel_kp($link_excel_kp_tovar);
+      print_r($arr_tovari);
+      add_tovar_to_sdelka ($connect_data, $arr_tovari, $id_sdelka) ;
+  } else {
+    echo "<br>*********** ОТСУТСТВУЕТ ФАЙЛ *****************<br>";
+  }
+   
+  }
+/// Добавляем примечание к сделке
+  add_note_to_sdelka ($connect_data, $sdelki, $id_sdelka);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// ************** цепляем задачу к сделке  (если она есть)
-
-    $DateNextCall = $sdelki['DateNextCall'];
-
-    if ($DateNextCall != '0000-00-00') {
-     
-        $currentTime = strtotime($DateNextCall); // переводим время с 1980 года
-        $data_temp5[] = array (
-            "text" => "Звонок (API)",
-            "complete_till" => $currentTime, 
-            "entity_id" => $id_sdelka,
-            "entity_type" => "leads"
-    );
-    $data = json_encode($data_temp5, JSON_UNESCAPED_UNICODE);
-    $res = post_query_in_amo($access_token, $subdomain , "/api/v4/tasks" , $data);
-    unset($data_temp5); // удаляем массив с задачами
-
-    }
-    
-// ********************  Редактируем статус сделки  ***********************************************
-$KpCondition = $sdelki['KpCondition'];
-$Kpclosed = $sdelki['FinishContract'];
-$time_status_sell = $sdelki['date_sell'];
-$time_status_close = $sdelki['date_close'];
-// echo "<br>SEL = $time_status_sell <br> CLOSE $time_status_close";
-$data = change_status_sdelka ($id_sdelka, $KpCondition, $time_status_sell, $time_status_close, $Kpclosed);
-// echo "<br>DATA = $data";
-$res= send_patch_in_amo($access_token, $subdomain , "/api/v4/leads" , $data);
-
-
-
-////  смена воронки принудительно еще  арз 
-// $data = change_pipeline_sdelka ($id_sdelka, 7242730);
-// $res= send_patch_in_amo($access_token, $subdomain , "/api/v4/leads" , $data);
-}
+// обновляем id амо сделки в реестре
+echo "<br>*********** UPDATE REESTR AMO_ID_LEAD *****************<br>";
+  update_amo_id_in_my_reesrt ($pdo, $id_sdelka, $sdelki);

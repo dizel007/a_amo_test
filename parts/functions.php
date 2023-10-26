@@ -4,9 +4,13 @@
   ********************************************************************************************************************/
   Function Make_simple_sdelka ($sdelki, $pipeline_id){
 
-    // const LINK_FOR_CHANGE_KP = 474647; 
-
+    if ($sdelki['InnCustomer'] != 0) { // если есть ИНН
     $name_sdelka = "№".$sdelki['KpNumber']." от " .$sdelki['KpData'];
+    } else { // если нет ИНН то дописывает Название компании
+    $name_sdelka = "№".$sdelki['KpNumber']." от " .$sdelki['KpData'] ." (".$sdelki['NameCustomer'].")";
+    }
+
+
     $link_to_change_kp = 'https://brazel.ru/?transition=30&id='.$sdelki['id'];
     $link_to_see_excel = 'https://brazel.ru/'.$sdelki['LinkKp']; // сыслка на ЕКСЕЛЬ файд
     $link_by_id_kp = 'https://brazel.ru/?transition=10&id='.$sdelki['id']; // ссылка на КП и чтобы компанию выводило
@@ -39,7 +43,7 @@
                    "values" => array(array ("value" => $link_to_change_kp)) // ссылка на корректировку КП
                     ),
             array ("field_id" => 474717,
-                  "values" => array(array ("value" => $link_to_see_excel)) // ссылка на ПДФ КП
+                  "values" => array(array ("value" => $link_to_see_excel)) // ссылка на екскль КП
                   ),
             array ("field_id" => ID_KP,
             "values" => array(array ("value" => $id_kp)) // id в старом реестре
@@ -57,6 +61,7 @@
             ));
      $data = json_encode($data_temp, JSON_UNESCAPED_UNICODE);
     echo "<br>$data<br>";
+
     return  $data;
     }
 
@@ -443,6 +448,9 @@ function make_rigth_phone_type($phone_type) {
   ********************************************************************************************************************/
  function get_status_kp($sdelki) {
     $KpCondition = $sdelki['KpCondition'];
+    $magager = $sdelki['Responsible'];
+    $KpSendMail = $sdelki['email_count'];
+
     $Kpclosed = $sdelki['FinishContract'];
     $time_status_sell = $sdelki['date_sell'];
     $time_status_close = $sdelki['date_close'];
@@ -450,6 +458,9 @@ function make_rigth_phone_type($phone_type) {
     if ($KpCondition == 'Купили у нас') {
       $status_sdelki = 142; // сделка состоялась
       $currentTime = strtotime($time_status_sell);
+    } elseif ($Kpclosed == 1) {
+      $status_sdelki = 143; // ЕСЛИ ЗАКРЫЛИ СДЕЛКУ БЕЗ УТОЧНЕНИЯ СТАТУСА
+      $currentTime = strtotime(date('Y-m-d'));
     } elseif ($KpCondition == 'Не требуется') {
       $currentTime = strtotime($time_status_close);
       $status_sdelki = 143; // сделака НЕ СОСТОЯЛАСЬ
@@ -457,11 +468,11 @@ function make_rigth_phone_type($phone_type) {
       $status_sdelki = 143;
       $currentTime = strtotime($time_status_close);
     } elseif ($KpCondition == 'В работе') {
-      $status_sdelki = 61225346; // переговоры 
+      $status_sdelki = 61225350; // КП отправлено 
       $currentTime = 0;
-    } elseif ($Kpclosed == 1) {
-        $status_sdelki = 143; // ЕСЛИ ЗАКРЫЛИ СДЕЛКУ БЕЗ УТОЧНЕНИЯ СТАТУСА
-        $currentTime = strtotime(date('Y-m-d'));
+    } elseif ($KpSendMail  >= 1 ) {
+      $status_sdelki = 61225350; // КП отправлено 
+      $currentTime = 0;
     } else {
       $status_sdelki = 61225342;
       $currentTime = 0;
@@ -476,6 +487,9 @@ function make_rigth_phone_type($phone_type) {
   ********************************************************************************************************************/
  function get_status_kp_OBJ($sdelki) {
   $KpCondition = $sdelki['KpCondition'];
+  $magager = $sdelki['Responsible'];
+  $KpSendMail = $sdelki['email_count'];
+
   $Kpclosed = $sdelki['FinishContract'];
   $time_status_sell = $sdelki['date_sell'];
   $time_status_close = $sdelki['date_close'];
@@ -483,6 +497,9 @@ function make_rigth_phone_type($phone_type) {
   if ($KpCondition == 'Купили у нас') {
     $status_sdelki = 142; // сделка состоялась
     $currentTime = strtotime($time_status_sell);
+  } elseif ($Kpclosed == 1) {
+    $status_sdelki = 143; // ЕСЛИ ЗАКРЫЛИ СДЕЛКУ БЕЗ УТОЧНЕНИЯ СТАТУСА
+    $currentTime = strtotime(date('Y-m-d'));
   } elseif ($KpCondition == 'Не требуется') {
     $currentTime = strtotime($time_status_close);
     $status_sdelki = 143; // сделака НЕ СОСТОЯЛАСЬ
@@ -492,9 +509,14 @@ function make_rigth_phone_type($phone_type) {
   } elseif ($KpCondition == 'В работе') {
     $status_sdelki = 61313982; // переговоры 
     $currentTime = 0;
-  } elseif ($Kpclosed == 1) {
-      $status_sdelki = 143; // ЕСЛИ ЗАКРЫЛИ СДЕЛКУ БЕЗ УТОЧНЕНИЯ СТАТУСА
-      $currentTime = strtotime(date('Y-m-d'));
+  } elseif ($KpSendMail  >= 1 ) {
+    $status_sdelki = 61313982; // КП отправлено 
+    $currentTime = 0;
+  } elseif ($magager  != '' ) {
+    $status_sdelki = 61313986; // Менеждер назначен 
+    $currentTime = 0;
+
+
   } else {
     $status_sdelki = 61313978;
     $currentTime = 0;
@@ -529,3 +551,137 @@ function  get_responsible($sdelki) {
   }
 return  $responsible_user_id;
 }
+
+
+
+   /******************************************************************************************************************
+  *************  / Функция по добавлению товаров к сделке  ************************* 
+  ********************************************************************************************************************/
+
+function add_tovar_to_sdelka ($connect_data, $arr_tovari, $id_sdelka) {
+  foreach ($arr_tovari as $tovar) {
+    $new_ed_izm = make_rigth_ed_izm($tovar['ed_izm']); // стандартизируем единицы измерения
+
+    $data_tovar [] = array(
+        //*******************  Название товара   ************************************
+                "name" => $tovar['name'], 
+                "custom_fields_values" => array(
+        // *******************  Артикул  товара *******************************************
+                        array("field_id" => SKU_TOVAROV, // Цена  товара
+                        "values" => array (array("value" =>  ""))
+                        ),
+          //*******************  Группв  товара ************************************
+                    array("field_id" => GROUP_TOVAROV, 
+                          "values" => array (array("value" => "Объектные"))
+                    ),
+        // *******************  Цена  товара *******************************************
+                    array("field_id" => PRICE_TOVAROV, // Цена  товара
+                          "values" => array (array("value" => $tovar['price']))
+                         ),
+        //*******************  Единица измерения  товара ************************************
+                    array("field_id" => UNIT_TOVAROV, 
+                          "values" => array (array("value" => $new_ed_izm))
+                         )
+                )
+        );
+        
+        
+        $data = json_encode($data_tovar, JSON_UNESCAPED_UNICODE);
+        $method = "/api/v4/catalogs/".CATALOG_TOVARI."/elements" ;
+        $res = post_query_in_amo($connect_data['access_token'], $connect_data['subdomain'], $method , $data);
+        $id_tovara = $res['_embedded']['elements'][0]['id'];
+        
+        // echo "<br><br>";
+        // echo $id_tovara;
+        // echo "<br><br>";
+       unset ($data_tovar); 
+     
+   
+
+       $data_coonect_tovar =  array( array(   
+            "to_entity_id" => $id_tovara,
+            "to_entity_type" => "catalog_elements",
+            "metadata"=> array (
+                "quantity" => $tovar['kolvo'],
+                "catalog_id" => CATALOG_TOVARI
+                    )       
+        
+            ));
+            
+        $data_z = json_encode($data_coonect_tovar, JSON_UNESCAPED_UNICODE);
+        $method = "/api/v4/leads/".$id_sdelka."/link";
+        $res = post_query_in_amo($connect_data['access_token'], $connect_data['subdomain'], $method , $data_z);
+        }
+}
+
+function make_rigth_ed_izm($ed_izm) { // функция приведения в порядок единицы измерения
+  $temp_ed_izm = strtolower($ed_izm); // все в нижний регистр
+  $temp_ed_izm =mb_eregi_replace("[^a-zа-яё0-9 ]", '', $temp_ed_izm); // убираем все кроме букв и цифр
+
+
+  if ($ed_izm == 'шт') {$new_ed_izm = 'шт';}
+  elseif ($ed_izm == 'кт') {$new_ed_izm = 'комплект';}
+  elseif ($ed_izm == 'комплект') {$new_ed_izm = 'комплект';}
+  elseif ($ed_izm == 'мп') {$new_ed_izm = 'мп';}
+  elseif ($ed_izm == 'м2') {$new_ed_izm = 'м2';}
+  elseif ($ed_izm == 'м3') {$new_ed_izm = 'м3';}
+  elseif ($ed_izm == 'пм') {$new_ed_izm = 'мп';}
+  elseif ($ed_izm == 'т') {$new_ed_izm = 'т';}
+  elseif ($ed_izm == 'кг') {$new_ed_izm = 'кг';}
+  elseif ($ed_izm == 'л') {$new_ed_izm = 'л';}
+  
+  else  {$new_ed_izm = 'шт';}
+
+return $new_ed_izm;
+}
+
+
+   /******************************************************************************************************************
+  *************  // Функция по добавлению примечания к сделке ************************* 
+  ********************************************************************************************************************/
+function add_note_to_sdelka ($connect_data, $sdelki, $id_sdelka) {
+  // echo "<br> **** Примечания  *****<br>";
+  if ($sdelki['Comment'] == '') { return false;} // если нет комментария то сразу уходим
+  
+  $method = "/api/v4/leads/".$id_sdelka."/notes";  // метод по доавлению примечания к сделке
+
+    // unset($data_temp5);
+    $comment = $sdelki['Comment'];
+    $arr_comment = explode('||+', $comment); // массив с комментариями
+    print_r($arr_comment);
+    
+     foreach ($arr_comment as $item_comment) {
+      
+          if ((strlen($item_comment) > 6)) {
+                $item_comment = str_replace('@!', '', $item_comment);
+                echo "<br>*****$item_comment******<br>";
+                $data_temp5[] = array(
+                    "note_type" => "common",
+                    "params" => array("text" => $item_comment),
+               );
+          }
+     } 
+  //  echo "<br> **** DATA_TEMO_5 *****<br>"; 
+  //  print_r($arr_comment);
+
+  if (isset($data_temp5)) { // Проверяем есть ли хоть одно примечание 
+    $data = json_encode($data_temp5, JSON_UNESCAPED_UNICODE);
+    $res= post_query_in_amo($connect_data['access_token'], $connect_data['subdomain'], $method , $data);
+  }
+  // echo "<br> **** Примечания  вышли *****<br>";
+}
+
+/******************************************************************************************************************
+*************  Функция, которая обновляет ID амо сделки в реестре  ************************************************ 
+********************************************************************************************************************/
+function update_amo_id_in_my_reesrt ($pdo, $id_sdelka, $sdelki) {
+  $data_arr = [
+    'id_amo_lead'=> $id_sdelka,
+    'id' => $sdelki['id'],
+  ];
+  
+$sql = "UPDATE reestrkp SET id_amo_lead=:id_amo_lead WHERE id=:id";
+$stmt= $pdo->prepare($sql);
+$stmt->execute($data_arr);
+}
+
